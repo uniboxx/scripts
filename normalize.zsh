@@ -281,6 +281,7 @@ if [[ -z "$files" ]]; then
     done
     print ""
 
+    local answer="Y"
     vared -p "${c_white}Procedere con la normalizzazione? (${c_green}Y/n${reset}): " answer
     answer="${answer//[[:space:]]/}"
     if [[ -n "$answer" && "$answer" != [Yy] ]]; then
