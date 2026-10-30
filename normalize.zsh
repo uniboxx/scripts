@@ -227,13 +227,19 @@ function normalize_files() {
         # Esegue FFmpeg sul file di destinazione (target_file)
         if ffmpeg -y -i "$file" -af "loudnorm=I=-${db}:TP=-1.5:LRA=11:measured_i=${measured_i}:measured_tp=${measured_tp}:measured_lra=${measured_lra}:measured_thresh=${measured_thresh}:linear=true" -c:v copy -c:a aac -b:a 192k "$target_file" >/dev/null 2>&1; then
             # Controlla se il file == __
+            local final_file=""
             if [[ "$filename:t" == *__ ]]; then
-                mv "$target_file" "${filename}norm.${ext}"
-            # altrimenti lo rinomina con _norm
+                final_file="${filename}norm.${ext}"
             else
-                mv "$target_file" "${filename}_norm.${ext}"
+                final_file="${filename}_norm.${ext}"
             fi
-            if [[ "$target_file" != "$file" ]]; then
+
+            # 2. Rinomina il file temporaneo usando la nuova variabile
+            mv "$target_file" "$final_file"
+
+            # 3. CONDIZIONE DI SICUREZZA:
+            # Rimuove il file di origine SOLO se il file finale ha un nome diverso
+            if [[ "$final_file" != "$file" ]]; then
                 rm "$file"
             fi
         else
