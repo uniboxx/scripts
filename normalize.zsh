@@ -7,7 +7,7 @@
 # Descrizione: Converte l'audio dei file video in aac e normalizza l'audio con il valore della variabile db.
 
 # Nota: Lo script usa sintassi zsh per cui occorre aver installato zsh.
-# Utilizzo: normalize <files> | enter per tutti i files nella cartella corrente con estensioni definite in extensions.
+# Utilizzo: ./normalize.zsh <files> | enter per tutti i files nella cartella corrente con estensioni definite in extensions.
 
 # resetta zsh
 emulate -L zsh
