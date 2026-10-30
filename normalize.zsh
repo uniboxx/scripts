@@ -7,7 +7,7 @@
 # Descrizione: Converte l'audio dei file video in aac e normalizza l'audio con il valore della variabile db.
 
 # Nota: Lo script usa sintassi zsh per cui occorre aver installato zsh.
-# Utilizzo: ./normalize.zsh <files> | enter per tutti i files nella cartella corrente con estensioni definite in extensions.
+# Utilizzo: normalize <files> | enter per tutti i files nella cartella corrente con estensioni definite in extensions.
 
 # resetta zsh
 emulate -L zsh
@@ -15,6 +15,16 @@ emulate -L zsh
 autoload -Uz compinit && compinit -i
 # Abilita globbing
 setopt EXTENDED_GLOB NULL_GLOB
+
+#########################################################
+# BLOCCO AUTO-PROTEZIONE DALLA SOSPENSIONE (ANTI-STANDBY)
+#########################################################
+# Se lo script non è già protetto, viene riavviato sotto systemd-inhibit
+if [[ -z "$SCRIPT_INHIBITED" ]]; then
+    export SCRIPT_INHIBITED=1
+    exec systemd-inhibit --what=idle:sleep --who="normalize.zsh" --why="Normalizzazione batch audio/video con FFmpeg" "$0" "$@"
+fi
+#########################################################
 
 # Colori
 bold=$'\033[1m'
