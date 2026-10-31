@@ -16,11 +16,20 @@ autoload -Uz compinit && compinit -i
 # Abilita globbing
 setopt EXTENDED_GLOB NULL_GLOB
 
-if [[ -z "$SCRIPT_INHIBITED" ]]; then
-    export SCRIPT_INHIBITED=1
-    # caffeinate lancia una copia protetta dello script. Quando finisce, tutto torna come prima.
-    exec caffeinate "$0" "${@:-}"
-fi
+# Salva il timeout di sospensione attuale (in minuti)
+OLD_SUSPEND_TIMEOUT=$(kreadconfig6 --file powerdevilrc --group AC --key SuspendTimeout)
+
+# Imposta il timeout di sospensione a 0 (MAI andare in sospensione hardware)
+kwriteconfig6 --file powerdevilrc --group AC --key SuspendTimeout 0
+# Forza KDE a ricaricare la configurazione energetica
+qdbus6 org.kde.Solid.PowerManagement /org/kde/Solid/PowerManagement org.kde.Solid.PowerManagement.refreshStatus
+
+# Funzione per rimettere a posto le cose alla fine dello script
+ripristina_powerdevil() {
+    kwriteconfig6 --file powerdevilrc --group AC --key SuspendTimeout "$OLD_SUSPEND_TIMEOUT"
+    qdbus6 org.kde.Solid.PowerManagement /org/kde/Solid/PowerManagement org.kde.Solid.PowerManagement.refreshStatus
+}
+trap ripristina_powerdevil EXIT INT TERM
 
 # Colori
 export bold=$'\033[1m'
