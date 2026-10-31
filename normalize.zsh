@@ -114,6 +114,7 @@ function check_files() {
                 # 3. Se già normalizzato, lo salta
                 if [[ "${file:t:r}" == *_norm ]]; then
                     already_normalized_list+=( "$file" )
+                    # valid_list+=( "$file" )
                 else
                     # 4. Se non normalizzato, lo normalizza
                     valid_list+=( "$file" )
