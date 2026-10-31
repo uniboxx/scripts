@@ -193,9 +193,6 @@ function normalize_file() {
     # Definiamo un'intestazione breve per distinguere i log paralleli
     local tag="${c_yellow}$file:t${reset}"
 
-    print -P "${c_magenta}----------------------------------------${reset}"
-    print -P "Processing: $tag..."
-
     # Estrae l'estensione originale (es. mp4, mkv, avi)
     local ext="${(L)file##*.}"
     # Estrae il nome del file senza l'estensione
@@ -204,7 +201,8 @@ function normalize_file() {
     local target_file="${filename}_temp_processing.${ext}"
 
     # Passaggio 1: Analisi
-    print "${c_cyan}Passaggio 1: Analisi di ${c_yellow}$file:t ${c_cyan}${reset}"
+     print -P "${c_cyan}----------------------------------------"
+    print "Passaggio 1: Analisi di $tag"
 
     local stats
     stats=$(ffmpeg -i "$file" -af loudnorm=I=-18:TP=-1.5:LRA=11:print_format=json -f null - 2>&1)
@@ -222,12 +220,12 @@ function normalize_file() {
         return 1
     fi
 
-    print -P "${c_orange}----------------------------------------${reset}"
+    print -P "${c_magenta}----------------------------------------${reset}"
     # Mostra i valori rilevati a terminale
     print "${c_white}Valori rilevati -> I: ${c_orange}$measured_i${c_white} | TP: ${c_orange}$measured_tp${c_white} | LRA: ${c_orange}$measured_lra${c_white} | Thresh: ${c_orange}$measured_thresh${reset}"
 
     # Passaggio 2: Normalizzazione
-    print "${c_orange}Passaggio 2: Normalizzazione di ${c_yellow}$file:t ${c_cyan}${reset}"
+    print "${c_magenta}Passaggio 2: Normalizzazione di $tag"
 
     # Esegue FFmpeg sul file di destinazione (target_file)
     if ffmpeg -y -i "$file" -af "loudnorm=I=-${db}:TP=-1.5:LRA=11:measured_i=${measured_i}:measured_tp=${measured_tp}:measured_lra=${measured_lra}:measured_thresh=${measured_thresh}:linear=true" -c:v copy -c:a aac -b:a 192k "$target_file" >/dev/null 2>&1; then
@@ -249,10 +247,10 @@ function normalize_file() {
         fi
         
         print -P "${c_green}----------------------------------------${reset}"
-        print -P "✔ ${c_yellow}$file:t ${c_green}completato con successo.${reset}"
+        print -P "✔ $tag ${c_green}completato con successo.${reset}"
     else
         print -P "${c_red}----------------------------------------${reset}"
-        print -P "${c_red}✘ Errore durante l'elaborazione di:${c_yellow} $file ${reset}"
+        print -P "${c_red}✘ Errore durante l'elaborazione di: $tag."
         # Rimuove il file temporaneo/parziale se è stato creato per non lasciare spazzatura
         [[ -f "$target_file" ]] && rm "$target_file"
     fi
