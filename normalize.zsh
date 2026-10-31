@@ -18,23 +18,23 @@ setopt EXTENDED_GLOB NULL_GLOB
 
 if [[ -z "$SCRIPT_INHIBITED" ]]; then
     export SCRIPT_INHIBITED=1
-    # Usa l'interfaccia dbus nativa di KDE per bloccare SOLO la sospensione, lasciando lo screen locker indipendente
-    exec qdbus org.kde.Solid.PowerManagement.PolicyAgent /org/kde/Solid/PowerManagement/PolicyAgent org.kde.Solid.PowerManagement.PolicyAgent.AddInhibitor 1 "normalize.zsh" "Normalizzazione audio" "$0" "$@"
+    # Protegge lo sleep hardware e passa i parametri in modo sicuro
+    exec systemd-inhibit --what=sleep --who="normalize.zsh" --why="Normalizzazione parallela con FFmpeg" "$0" "${@:-}"
 fi
 
 # Colori
-bold=$'\033[1m'
-reset=$'\033[0m'
-c_white=$'\033[1;37m'
-c_red=$'\033[1;31m'
-c_cyan=$'\033[1;36m'
-c_green=$'\033[1;32m'
-c_yellow=$'\033[1;33m'
-c_magenta=$'\033[1;35m'
-c_orange=$'\033[1;38;2;255;153;0m'
+export bold=$'\033[1m'
+export reset=$'\033[0m'
+export c_white=$'\033[1;37m'
+export c_red=$'\033[1;31m'
+export c_cyan=$'\033[1;36m'
+export c_green=$'\033[1;32m'
+export c_yellow=$'\033[1;33m'
+export c_magenta=$'\033[1;35m'
+export c_orange=$'\033[1;38;2;255;153;0m'
 
 # Variabili (range ottimale -24dB a -14dB)
-db="18"
+export db="18"
 typeset -a extensions=(mp4 mkv avi mov flv ts)
 files="$@"
 typeset -a files_list=()
@@ -186,72 +186,71 @@ function ask4files() {
     done
 }
 
-function normalize_files() {
-    for file in "${files_list[@]}"; do
-        print -P "${c_magenta}----------------------------------------${reset}"
-        print -P "Processing: ${c_yellow}$file:t${reset} ..."
+function normalize_file() {
+    local file="$1"
+    [[ -z "$file" ]] && return
 
-        # Estrae l'estensione originale (es. mp4, mkv, avi)
-        ext="${(L)file##*.}"
-        # Estrae il nome del file senza l'estensione
-        filename="${file%.*}"
-        target_file="${filename}_temp_processing.${ext}"
+    # Definiamo un'intestazione breve per distinguere i log paralleli
+    local tag="[${c_yellow}$file:t${reset}]"
 
-        # Passaggio 1: Analisi
-        print "${c_cyan}Passaggio 1: Analisi di ${c_yellow}$file:t ${c_cyan}${reset}"
-        stats=$(ffmpeg -i "$file" -af loudnorm=I=-18:TP=-1.5:LRA=11:print_format=json -f null - 2>&1)
-
-        measured_i=$(echo "$stats" | sed -n 's/.*"input_i" : "\([^"]*\)".*/\1/p')
-        measured_tp=$(echo "$stats" | sed -n 's/.*"input_tp" : "\([^"]*\)".*/\1/p')
-        measured_lra=$(echo "$stats" | sed -n 's/.*"input_lra" : "\([^"]*\)".*/\1/p')
-        measured_thresh=$(echo "$stats" | sed -n 's/.*"input_thresh" : "\([^"]*\)".*/\1/p')
-
-        # Controllo di sicurezza: se la variabile è vuota, stampa i log di FFmpeg ed esce
-        if [[ -z "$measured_i" ]]; then
-            print "${c_red}Errore: Impossibile analizzare l'audio di ${c_yellow}$file. ${c_cyan}Ecco l'output di FFmpeg:${reset}"
-            echo "$stats" | tail -n 25
-            print "${c_red}----------------------------------------${reset}"
-            exit 1
-        fi
-
-        # Mostra i valori rilevati a terminale
-        print "${c_white}Valori rilevati -> I: ${c_orange}$measured_i${c_white} | TP: ${c_orange}$measured_tp${c_white} | LRA: ${c_orange}$measured_lra${c_white} | Thresh: ${c_orange}$measured_thresh${reset}"
-
-        # Passaggio 2: Normalizzazione
-        print "${c_cyan}Passaggio 2: Normalizzazione di ${c_yellow}$file:t ${c_cyan}${reset}"
-
-        # Esegue FFmpeg sul file di destinazione (target_file)
-        if ffmpeg -y -i "$file" -af "loudnorm=I=-${db}:TP=-1.5:LRA=11:measured_i=${measured_i}:measured_tp=${measured_tp}:measured_lra=${measured_lra}:measured_thresh=${measured_thresh}:linear=true" -c:v copy -c:a aac -b:a 192k "$target_file" >/dev/null 2>&1; then
-            # Controlla se il file == __
-            local final_file=""
-            if [[ "$filename:t" == *__ ]]; then
-                final_file="${filename}norm.${ext}"
-            else
-                final_file="${filename}_norm.${ext}"
-            fi
-
-            # 2. Rinomina il file temporaneo usando la nuova variabile
-            mv "$target_file" "$final_file"
-
-            # 3. CONDIZIONE DI SICUREZZA:
-            # Rimuove il file di origine SOLO se il file finale ha un nome diverso
-            if [[ "$final_file" != "$file" ]]; then
-                rm "$file"
-            fi
-        else
-            print -P "${c_red}✘ Errore durante l'elaborazione di:${c_yellow} $file ${reset}"
-            # Rimuove il file temporaneo/parziale se è stato creato per non lasciare spazzatura
-            [[ -f "$target_file" ]] && rm "$target_file"
-        fi
-    done
-
-    # Stampa un messaggio di conclusione
     print -P "${c_magenta}----------------------------------------${reset}"
-    print -P "${c_white}Processo completato. Livello medio db: ${c_yellow}${db}dB!${reset}\n"
+    print -P "Processing: $tag..."
 
-    loginctl loock
+    # Estrae l'estensione originale (es. mp4, mkv, avi)
+    local ext="${(L)file##*.}"
+    # Estrae il nome del file senza l'estensione
+    local filename="${file%.*}"
+    # Assegna un nome temporaneo per il file in elaborazione
+    local target_file="${filename}_temp_processing.${ext}"
 
-    exit 0
+    # Passaggio 1: Analisi
+    print "${c_cyan}Passaggio 1: Analisi di ${c_yellow}$file:t ${c_cyan}${reset}"
+    local stats
+    stats=$(ffmpeg -i "$file" -af loudnorm=I=-18:TP=-1.5:LRA=11:print_format=json -f null - 2>&1)
+
+    local measured_i=$(echo "$stats" | sed -n 's/.*"input_i" : "\([^"]*\)".*/\1/p')
+    local measured_tp=$(echo "$stats" | sed -n 's/.*"input_tp" : "\([^"]*\)".*/\1/p')
+    local measured_lra=$(echo "$stats" | sed -n 's/.*"input_lra" : "\([^"]*\)".*/\1/p')
+    local measured_thresh=$(echo "$stats" | sed -n 's/.*"input_thresh" : "\([^"]*\)".*/\1/p')
+
+    # Controllo di sicurezza: se la variabile è vuota, stampa i log di FFmpeg ed esce
+    if [[ -z "$measured_i" ]]; then
+        print "${c_red}Errore: Impossibile analizzare l'audio di ${c_yellow}$file. ${c_cyan}Ecco l'output di FFmpeg:${reset}"
+        echo "$stats" | tail -n 25
+        print "${c_red}----------------------------------------${reset}"
+        return 1
+    fi
+
+    # Mostra i valori rilevati a terminale
+    print "${c_white}Valori rilevati -> I: ${c_orange}$measured_i${c_white} | TP: ${c_orange}$measured_tp${c_white} | LRA: ${c_orange}$measured_lra${c_white} | Thresh: ${c_orange}$measured_thresh${reset}"
+
+    # Passaggio 2: Normalizzazione
+    print "${c_cyan}Passaggio 2: Normalizzazione di ${c_yellow}$file:t ${c_cyan}${reset}"
+
+    # Esegue FFmpeg sul file di destinazione (target_file)
+    if ffmpeg -y -i "$file" -af "loudnorm=I=-${db}:TP=-1.5:LRA=11:measured_i=${measured_i}:measured_tp=${measured_tp}:measured_lra=${measured_lra}:measured_thresh=${measured_thresh}:linear=true" -c:v copy -c:a aac -b:a 192k "$target_file" >/dev/null 2>&1; then
+        # Controlla se il file == __
+        local final_file=""
+        if [[ "$filename:t" == *__ ]]; then
+            final_file="${filename}norm.${ext}"
+        else
+            final_file="${filename}_norm.${ext}"
+        fi
+
+        # 2. Rinomina il file temporaneo usando la nuova variabile
+        mv "$target_file" "$final_file"
+
+        # 3. CONDIZIONE DI SICUREZZA:
+        # Rimuove il file di origine SOLO se il file finale ha un nome diverso
+        if [[ "$final_file" != "$file" ]]; then
+            rm "$file"
+        fi
+        print -P "✔ ${c_cyan}Completato con successo:${c_yellow} $file:t ${reset}"
+    else
+        print -P "${c_red}✘ Errore durante l'elaborazione di:${c_yellow} $file ${reset}"
+        # Rimuove il file temporaneo/parziale se è stato creato per non lasciare spazzatura
+        [[ -f "$target_file" ]] && rm "$target_file"
+    fi
 }
 
 ################################################################
@@ -307,5 +306,41 @@ else
     ask4files
 fi
 
-normalize_files
+# ===========================
+# MOTORE DI PARALLELIZZAZIONE
+# ===========================
+local num_jobs=3
+typeset -A running_pids=()
 
+print -P "\n${c_white}🚀 Avvio elaborazione parallela ${c_cyan}($num_jobs file simultanei)...${reset}\n"
+
+for file in "${files_list[@]}"; do
+    # 1. Avvia la funzione in background
+    normalize_file "$file" &
+    
+    # 2. Cattura il PID dell'ultimo processo appena lanciato ($!)
+    local pid=$!
+    running_pids[$pid]=$file
+
+    # 3. Se abbiamo raggiunto il limite di 2 job attivi, aspettiamo che uno si liberi
+    while (( ${#running_pids} >= num_jobs )); do
+        # Controlliamo ciclicamente se i processi attivi sono ancora vivi
+        for pid_active in ${(k)running_pids}; do
+            # kill -0 controlla se il processo esiste senza fargli nulla
+            if ! kill -0 $pid_active 2>/dev/null; then
+                # Se il processo è morto, lo rimuoviamo dall'array per liberare un posto
+                unset "running_pids[$pid_active]"
+                break
+            fi
+        done
+        # Aspetta una frazione di secondo prima del prossimo controllo per non sovraccaricare la CPU
+        sleep 0.5
+    done
+done
+
+# 4. Aspetta la conclusione degli ultimi file rimasti nella coda
+wait
+
+print -P "${c_magenta}----------------------------------------${reset}"
+print -P "${c_white}Processo batch completato. Livello medio db: ${c_yellow}${db}dB!${reset}\n"
+exit 0
