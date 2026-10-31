@@ -51,7 +51,7 @@ export c_orange=$'\033[1;38;2;255;153;0m'
 
 # Variabili (range ottimale -24dB a -14dB)
 # opzioni per ffmpeg
-export db="21"
+export db="24"
 export tp="2.0"
 export lra="18"
 
