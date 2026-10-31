@@ -49,11 +49,12 @@ export c_yellow=$'\033[1;33m'
 export c_magenta=$'\033[1;35m'
 export c_orange=$'\033[1;38;2;255;153;0m'
 
-# Variabili (range ottimale -24dB a -14dB)
+# Variabili 
 # opzioni per ffmpeg
 export db="24"
 export tp="2.0"
-export lra="18"
+export lra="12"
+export target_linear="false"
 
 typeset -a extensions=(mp4 mkv avi mov flv ts)
 files="$@"
@@ -114,7 +115,6 @@ function check_files() {
                 # 3. Se già normalizzato, lo salta
                 if [[ "${file:t:r}" == *_norm ]]; then
                     already_normalized_list+=( "$file" )
-                    # valid_list+=( "$file" )
                 else
                     # 4. Se non normalizzato, lo normalizza
                     valid_list+=( "$file" )
@@ -255,7 +255,7 @@ function normalize_file() {
     print "${c_magenta}Passaggio 2: Normalizzazione di $tag"
 
     # Esegue FFmpeg sul file di destinazione (target_file)
-    if ffmpeg -y -i "$file" -af "loudnorm=I=-${db}:TP=-${tp}:LRA=${lra}:measured_i=${measured_i}:measured_tp=${measured_tp}:measured_lra=${measured_lra}:measured_thresh=${measured_thresh}:linear=true" -c:v copy -c:a aac -b:a 192k "$target_file" >/dev/null 2>&1; then
+    if ffmpeg -y -i "$file" -af "loudnorm=I=-${db}:TP=-${tp}:LRA=${lra}:measured_i=${measured_i}:measured_tp=${measured_tp}:measured_lra=${measured_lra}:measured_thresh=${measured_thresh}:linear=${target_linear}" -c:v copy -c:a aac -b:a 192k "$target_file" >/dev/null 2>&1; then
         # Controlla se il file == __
         local final_file=""
         if [[ "$filename:t" == *__ ]]; then
@@ -270,7 +270,7 @@ function normalize_file() {
         # 3. CONDIZIONE DI SICUREZZA:
         # Rimuove il file di origine SOLO se il file finale ha un nome diverso
         if [[ "$final_file" != "$file" ]]; then
-            rm "$file"
+            # rm "$file"
         fi
         
         print -P "${c_green}----------------------------------------${reset}"
