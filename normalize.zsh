@@ -18,8 +18,8 @@ setopt EXTENDED_GLOB NULL_GLOB
 
 if [[ -z "$SCRIPT_INHIBITED" ]]; then
     export SCRIPT_INHIBITED=1
-    # Protegge lo sleep hardware e passa i parametri in modo sicuro
-    exec systemd-inhibit --what=sleep --who="normalize.zsh" --why="Normalizzazione parallela con FFmpeg" "$0" "${@:-}"
+    # caffeinate lancia una copia protetta dello script. Quando finisce, tutto torna come prima.
+    exec caffeinate "$0" "${@:-}"
 fi
 
 # Colori
@@ -344,6 +344,7 @@ done
 # 4. Aspetta la conclusione degli ultimi file rimasti nella coda
 wait
 
-print -P "${c_magenta}----------------------------------------${reset}"
-print -P "${c_white}Processo batch completato. Livello medio db: ${c_yellow}${db}dB!${reset}\n"
+print -P "\n${c_white}========================================${reset}"
+print -P "${c_white}Processo batch completato. Livello medio db: ${c_yellow}${db}dB!${reset}"
+print -P "${c_white}========================================${reset}\n"
 exit 0
