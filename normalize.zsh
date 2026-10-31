@@ -22,6 +22,22 @@ if [[ -z "$SCRIPT_INHIBITED" ]]; then
     exec systemd-inhibit --what=sleep --who="normalize.zsh" --why="Normalizzazione parallela con FFmpeg" "$0" "${@:-}"
 fi
 
+# Funzione di arresto forzato
+pulisci_ed_esci() {
+    # Disattiva temporaneamente il trap per evitare cicli infiniti
+    trap - INT TERM EXIT
+    print -P "\n${c_red}‼ Interruzione totale rilevata. Arresto immediato di tutte le conversioni...${reset}"
+    
+    # Rimuove in sicurezza solo i file temporanei legati a questo processo
+    rm -f ./*_temp_processing.* 2>/dev/null
+    
+    # Invia il segnale TERM a TUTTI i processi del gruppo di questo script (subshell comprese)
+    kill -TERM -$$ 2>/dev/null
+    exit 130
+}
+# Cattura il CTRL+C sia nello script principale che nei processi figli
+trap pulisci_ed_esci INT TERM
+
 # Colori
 export bold=$'\033[1m'
 export reset=$'\033[0m'
@@ -207,6 +223,12 @@ function normalize_file() {
     local stats
     stats=$(ffmpeg -i "$file" -af loudnorm=I=-18:TP=-1.5:LRA=11:print_format=json -f null - 2>&1)
 
+    # Se FFmpeg è stato interrotto (exit code 130, o comunque > 128), killa il padre e ferma la subshell
+    if (( $? > 128 )); then
+        kill -INT $$ 2>/dev/null
+        return 130
+    fi
+
     local measured_i=$(echo "$stats" | sed -n 's/.*"input_i" : "\([^"]*\)".*/\1/p')
     local measured_tp=$(echo "$stats" | sed -n 's/.*"input_tp" : "\([^"]*\)".*/\1/p')
     local measured_lra=$(echo "$stats" | sed -n 's/.*"input_lra" : "\([^"]*\)".*/\1/p')
@@ -320,7 +342,6 @@ print -P "\n${c_white}🚀 Avvio elaborazione parallela ${c_cyan}($num_jobs file
 for file in "${files_list[@]}"; do
     # 1. Avvia la funzione in background
     normalize_file "$file" &
-    
     # 2. Cattura il PID dell'ultimo processo appena lanciato ($!)
     local pid=$!
     running_pids[$pid]=$file
