@@ -16,15 +16,11 @@ autoload -Uz compinit && compinit -i
 # Abilita globbing
 setopt EXTENDED_GLOB NULL_GLOB
 
-#########################################################
-# BLOCCO AUTO-PROTEZIONE DALLA SOSPENSIONE (ANTI-STANDBY)
-#########################################################
-# Se lo script non è già protetto, viene riavviato sotto systemd-inhibit
 if [[ -z "$SCRIPT_INHIBITED" ]]; then
     export SCRIPT_INHIBITED=1
-    exec systemd-inhibit --what=idle --who="normalize.zsh" --why="Normalizzazione batch audio/video con FFmpeg" "$0" "$@"
+    # Usa l'interfaccia dbus nativa di KDE per bloccare SOLO la sospensione, lasciando lo screen locker indipendente
+    exec qdbus org.kde.Solid.PowerManagement.PolicyAgent /org/kde/Solid/PowerManagement/PolicyAgent org.kde.Solid.PowerManagement.PolicyAgent.AddInhibitor 1 "normalize.zsh" "Normalizzazione audio" "$0" "$@"
 fi
-#########################################################
 
 # Colori
 bold=$'\033[1m'
