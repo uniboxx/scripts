@@ -16,20 +16,11 @@ autoload -Uz compinit && compinit -i
 # Abilita globbing
 setopt EXTENDED_GLOB NULL_GLOB
 
-# Salva il timeout di sospensione attuale (in minuti)
-OLD_SUSPEND_TIMEOUT=$(kreadconfig6 --file powerdevilrc --group AC --key SuspendTimeout)
-
-# Imposta il timeout di sospensione a 0 (MAI andare in sospensione hardware)
-kwriteconfig6 --file powerdevilrc --group AC --key SuspendTimeout 0
-# Forza KDE a ricaricare la configurazione energetica
-qdbus6 org.kde.Solid.PowerManagement /org/kde/Solid/PowerManagement org.kde.Solid.PowerManagement.refreshStatus
-
-# Funzione per rimettere a posto le cose alla fine dello script
-ripristina_powerdevil() {
-    kwriteconfig6 --file powerdevilrc --group AC --key SuspendTimeout "$OLD_SUSPEND_TIMEOUT"
-    qdbus6 org.kde.Solid.PowerManagement /org/kde/Solid/PowerManagement org.kde.Solid.PowerManagement.refreshStatus
-}
-trap ripristina_powerdevil EXIT INT TERM
+if [[ -z "$SCRIPT_INHIBITED" ]]; then
+    export SCRIPT_INHIBITED=1
+    # Protegge lo sleep hardware e passa i parametri in modo sicuro
+    exec systemd-inhibit --what=sleep --who="normalize.zsh" --why="Normalizzazione parallela con FFmpeg" "$0" "${@:-}"
+fi
 
 # Colori
 export bold=$'\033[1m'
@@ -223,7 +214,7 @@ function normalize_file() {
 
     # Controllo di sicurezza: se la variabile è vuota, stampa i log di FFmpeg ed esce
     if [[ -z "$measured_i" ]]; then
-        print "${c_red}Errore: Impossibile analizzare l'audio di ${c_yellow}$file. ${c_cyan}Ecco l'output di FFmpeg:${reset}"
+        print "${c_red}Errore: Impossibile analizzare l'audio di $tag. ${c_cyan}Ecco l'output di FFmpeg:${reset}"
         echo "$stats" | tail -n 25
         print "${c_red}----------------------------------------${reset}"
         return 1
@@ -265,9 +256,9 @@ function normalize_file() {
     fi
 }
 
-################################################################
+########################################
 # FLUSSO PRINCIPALE DI ESECUZIONE (MAIN)
-################################################################
+########################################
 
 # Controlla se l'utente ha premuto invio senza inserire nulla. 
 if [[ -z "$files" ]]; then
@@ -353,7 +344,7 @@ done
 # 4. Aspetta la conclusione degli ultimi file rimasti nella coda
 wait
 
-print -P "\n${c_white}========================================${reset}"
+print -P "${c_white}========================================${reset}"
 print -P "${c_white}Processo batch completato. Livello medio db: ${c_yellow}${db}dB!${reset}"
 print -P "${c_white}========================================${reset}\n"
 exit 0
