@@ -22,7 +22,7 @@ setopt EXTENDED_GLOB NULL_GLOB
 # Se lo script non è già protetto, viene riavviato sotto systemd-inhibit
 if [[ -z "$SCRIPT_INHIBITED" ]]; then
     export SCRIPT_INHIBITED=1
-    exec systemd-inhibit --what=idle:sleep --who="normalize.zsh" --why="Normalizzazione batch audio/video con FFmpeg" "$0" "$@"
+    exec systemd-inhibit --what=idle --who="normalize.zsh" --why="Normalizzazione batch audio/video con FFmpeg" "$0" "$@"
 fi
 #########################################################
 
@@ -252,6 +252,9 @@ function normalize_files() {
     # Stampa un messaggio di conclusione
     print -P "${c_magenta}----------------------------------------${reset}"
     print -P "${c_white}Processo completato. Livello medio db: ${c_yellow}${db}dB!${reset}\n"
+
+    loginctl loock
+
     exit 0
 }
 
