@@ -50,7 +50,11 @@ export c_magenta=$'\033[1;35m'
 export c_orange=$'\033[1;38;2;255;153;0m'
 
 # Variabili (range ottimale -24dB a -14dB)
-export db="18"
+# opzioni per ffmpeg
+export db="21"
+export tp="2.0"
+export lra="18"
+
 typeset -a extensions=(mp4 mkv avi mov flv ts)
 files="$@"
 typeset -a files_list=()
@@ -221,7 +225,7 @@ function normalize_file() {
     print "Passaggio 1: Analisi di $tag"
 
     local stats
-    stats=$(ffmpeg -i "$file" -af loudnorm=I=-18:TP=-1.5:LRA=11:print_format=json -f null - 2>&1)
+    stats=$(ffmpeg -i "$file" -af loudnorm=I=-${db}:TP=-${tp}:LRA=${lra}:print_format=json -f null - 2>&1)
 
     # Se FFmpeg è stato interrotto (exit code 130, o comunque > 128), killa il padre e ferma la subshell
     if (( $? > 128 )); then
@@ -250,7 +254,7 @@ function normalize_file() {
     print "${c_magenta}Passaggio 2: Normalizzazione di $tag"
 
     # Esegue FFmpeg sul file di destinazione (target_file)
-    if ffmpeg -y -i "$file" -af "loudnorm=I=-${db}:TP=-1.5:LRA=11:measured_i=${measured_i}:measured_tp=${measured_tp}:measured_lra=${measured_lra}:measured_thresh=${measured_thresh}:linear=true" -c:v copy -c:a aac -b:a 192k "$target_file" >/dev/null 2>&1; then
+    if ffmpeg -y -i "$file" -af "loudnorm=I=-${db}:TP=-${tp}:LRA=${lra}:measured_i=${measured_i}:measured_tp=${measured_tp}:measured_lra=${measured_lra}:measured_thresh=${measured_thresh}:linear=true" -c:v copy -c:a aac -b:a 192k "$target_file" >/dev/null 2>&1; then
         # Controlla se il file == __
         local final_file=""
         if [[ "$filename:t" == *__ ]]; then
