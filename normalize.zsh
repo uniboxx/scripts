@@ -51,10 +51,17 @@ export c_orange=$'\033[1;38;2;255;153;0m'
 
 # Variabili 
 # opzioni per ffmpeg
-export db="21"
-export lra="7"
-export tp="1.5"
-export target_linear="false"
+typeset db="21"
+typeset lra="7"
+typeset tp="1.5"
+typeset target_linear="false"
+# opzioni passate allo script tramite flag
+local -A opts
+zparseopts -D -A opts -lra:
+if (( ${+opts[--lra]} )); then
+    lra=$opts[--lra]
+    print -P "${c_orange}Valore lra impostato a ${lra}${reset}"
+fi
 
 typeset -a extensions=(mp4 mkv avi mov flv ts)
 files="$@"
