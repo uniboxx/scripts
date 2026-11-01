@@ -51,9 +51,9 @@ export c_orange=$'\033[1;38;2;255;153;0m'
 
 # Variabili 
 # opzioni per ffmpeg
-export db="24"
-export tp="2.0"
-export lra="12"
+export db="21"
+export lra="7"
+export tp="1.5"
 export target_linear="false"
 
 typeset -a extensions=(mp4 mkv avi mov flv ts)
@@ -270,7 +270,7 @@ function normalize_file() {
         # 3. CONDIZIONE DI SICUREZZA:
         # Rimuove il file di origine SOLO se il file finale ha un nome diverso
         if [[ "$final_file" != "$file" ]]; then
-            # rm "$file"
+            rm "$file"
         fi
         
         print -P "${c_green}----------------------------------------${reset}"
