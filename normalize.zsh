@@ -2,7 +2,7 @@
 
 # Autore: Davide Pedrotti
 # Data creazione: 18/10/2026
-# Ultima modifica: 30/10/2026
+# Ultima modifica: 02/11/2026
 
 # Descrizione: Converte l'audio dei file video in aac e normalizza l'audio con il valore della variabile db.
 
