@@ -52,7 +52,7 @@ export c_orange=$'\033[1;38;2;255;153;0m'
 # Variabili 
 # opzioni per ffmpeg
 typeset db="21"
-typeset lra="7"
+typeset lra="11"
 typeset tp="1.5"
 typeset target_linear="false"
 # opzioni passate allo script tramite flag
