@@ -7,7 +7,8 @@
 # Descrizione: Converte l'audio dei file video in aac e normalizza l'audio con il valore della variabile db.
 
 # Nota: Lo script usa sintassi zsh per cui occorre aver installato zsh.
-# Utilizzo: normalize <files> | enter per tutti i files nella cartella corrente con estensioni definite in extensions.
+# Utilizzo: normalize <flags> <files> | default tutti i files nella cartella corrente con estensioni definite in extensions.
+# aggiungere il flag -a per abilitare la funzionalità solo analisi | aggiungere il flag --lra <valore> per impostare il valore di lra
 
 # resetta zsh
 emulate -L zsh
@@ -55,9 +56,15 @@ typeset db="21"
 typeset lra="11"
 typeset tp="1.5"
 typeset target_linear="false"
+typeset only_analyze="false"
 # opzioni passate allo script tramite flag
 local -A opts
-zparseopts -D -A opts -lra:
+typeset -a flag_analyze
+zparseopts -D -A opts -lra: a=flag_analyze
+if (( ${#flag_analyze} > 0 )); then
+    only_analyze="true"
+    print -P "${c_orange}======== Modalità solo analisi. NON verrà eseguite la normalizzazione. ========${reset}"
+fi
 if (( ${+opts[--lra]} )); then
     lra=$opts[--lra]
     print -P "${c_orange}Valore lra impostato a ${lra}${reset}"
@@ -229,7 +236,7 @@ function normalize_file() {
     local target_file="${filename}_temp_processing.${ext}"
 
     # Passaggio 1: Analisi
-     print -P "${c_cyan}----------------------------------------"
+    print -P "${c_cyan}----------------------------------------"
     print "Passaggio 1: Analisi di $tag"
 
     local stats
@@ -254,11 +261,18 @@ function normalize_file() {
         return 1
     fi
 
-    print -P "${c_magenta}----------------------------------------${reset}"
     # Mostra i valori rilevati a terminale
+    print -P "${c_cyan}----------------------------------------${reset}"
+    print -P "${c_cyan}Analisi di $tag ${c_cyan}completata.${reset}"
     print "${c_white}Valori rilevati -> I: ${c_orange}$measured_i${c_white} | TP: ${c_orange}$measured_tp${c_white} | LRA: ${c_orange}$measured_lra${c_white} | Thresh: ${c_orange}$measured_thresh${reset}"
 
+    # Se viene passato il flag -a, si ferma qui ed evita il passaggio 2
+    if [[ "$only_analyze" == "true" ]]; then
+        return 0
+    fi
+
     # Passaggio 2: Normalizzazione
+    print -P "${c_magenta}----------------------------------------${reset}"
     print "${c_magenta}Passaggio 2: Normalizzazione di $tag"
 
     # Esegue FFmpeg sul file di destinazione (target_file)
@@ -349,7 +363,7 @@ fi
 local num_jobs=3
 typeset -A running_pids=()
 
-print -P "\n${c_white}🚀 Avvio elaborazione parallela ${c_cyan}($num_jobs file simultanei)...${reset}\n"
+print -P "\n${c_white}🚀 Avvio elaborazione parallela ${c_cyan}(max $num_jobs file simultanei)...${reset}\n"
 
 for file in "${files_list[@]}"; do
     # 1. Avvia la funzione in background
@@ -378,6 +392,11 @@ done
 wait
 
 print -P "${c_white}========================================${reset}"
-print -P "${c_white}Processo batch completato. Livello medio db: ${c_yellow}${db}dB!${reset}"
+if [[ $only_analyze == "true" ]]; then 
+    print -P "${c_cyan}Processo di analisi completato.${reset}"
+else
+    print -P "${c_magenta}Processo di normalizzazione completato. Livello medio db: ${c_yellow}${db}dB!${reset}"
+fi
 print -P "${c_white}========================================${reset}\n"
+
 exit 0
