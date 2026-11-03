@@ -8,7 +8,7 @@
 
 # Nota: Lo script usa sintassi zsh per cui occorre aver installato zsh.
 # Utilizzo: normalize <flags> <files> | default tutti i files nella cartella corrente con estensioni definite in extensions.
-# aggiungere il flag -a per abilitare la funzionalità solo analisi | aggiungere il flag --lra <valore> per impostare il valore di lra
+# aggiungere il flag -a per abilitare la funzionalità solo analisi | aggiungere il flag --lra <valore> per impostare il valore di lra che di default vale 11
 
 # resetta zsh
 emulate -L zsh
@@ -187,19 +187,19 @@ function ask4files() {
             print -P "\n${c_yellow}! Segnalazione problemi di input (alcuni file verranno scartati):${reset}"
             # elenco files non trovati
             if (( ${#not_found_list} > 0 )); then
-                print -P "  - ${c_cyan}I seguenti file ${c_red}NON ESISTONO ${c_cyan}sul disco:${reset}"
+                print -P "  - ${c_white}I seguenti file ${c_red}NON ESISTONO ${c_cyan}sul disco:${reset}"
                 for file in "${not_found_list[@]}"; do
                     print -P "    ${c_orange}• $file${reset}"
                 done
             fi
             # elenco files non supportati
             if (( ${#invalid_list} > 0 )); then
-                print -P "  - ${c_cyan}I seguenti file ${c_red}NON SONO VIDEO VALIDI${c_cyan} (${extensions[*]}):${reset}"
+                print -P "  - ${c_white}I seguenti file ${c_red}NON SONO VIDEO VALIDI${c_cyan} (${extensions[*]}):${reset}"
                 for file in "${invalid_list[@]}"; do
                     print -P "    ${c_orange}• $file${reset}"
                 done
             fi
-            print -P "  - ${c_cyan}I seguenti file ${c_green}SONO VIDEO VALIDI:${reset}"
+            print -P "  - ${c_white}I seguenti file ${c_green}SONO VIDEO VALIDI:${reset}"
             for file in "${valid_list[@]}"; do
                 print -P "    ${c_green}• $file${reset}"
             done
@@ -340,13 +340,13 @@ if [[ -z "$files" ]]; then
     # Se ci sono file nuovi validi, procediamo alla richiesta di conferma
     files_list=( "${valid_list[@]}" )
 
-    print -P "\n${c_cyan}I seguenti file NUOVI verranno elaborati:${reset}"
+    print -P "\n${c_white}I seguenti file NUOVI verranno elaborati:${reset}"
     for file in "${files_list[@]}"; do
         print -P "  ${c_yellow}• $file:t${reset}"
     done
     print ""
 
-    local answer="Y"
+    local answer=""
     vared -p "${c_white}Procedere con la normalizzazione? (${c_green}Y/n${reset}): " answer
     answer="${answer//[[:space:]]/}"
     if [[ -n "$answer" && "$answer" != [Yy] ]]; then
@@ -363,7 +363,7 @@ fi
 local num_jobs=3
 typeset -A running_pids=()
 
-print -P "\n${c_white}🚀 Avvio elaborazione parallela ${c_cyan}(max $num_jobs file simultanei)...${reset}\n"
+print -P "\n${c_white}🚀 Avvio elaborazione parallela (max $num_jobs file simultanei)...${reset}\n"
 
 for file in "${files_list[@]}"; do
     # 1. Avvia la funzione in background
