@@ -17,6 +17,10 @@ autoload -Uz compinit && compinit -i
 # Abilita globbing
 setopt EXTENDED_GLOB NULL_GLOB
 
+# registra eventuali errori 
+typeset FAILED_LOG_FILE="./.normalizer_failed_list"
+rm -f "$FAILED_LOG_FILE" 2>/dev/null
+
 if [[ -z "$SCRIPT_INHIBITED" ]]; then
     export SCRIPT_INHIBITED=1
     # Protegge lo sleep hardware e passa i parametri in modo sicuro
@@ -242,11 +246,19 @@ function normalize_file() {
     local stats
     stats=$(ffmpeg -i "$file" -af loudnorm=I=-${db}:TP=-${tp}:LRA=${lra}:print_format=json -f null - 2>&1)
 
-    # Se FFmpeg è stato interrotto (exit code 130, o comunque > 128), killa il padre e ferma la subshell
-    if (( $? > 128 )); then
+    local ffmpeg_status=$?
+    # Se FFmpeg è stato interrotto (exit code 130), killa il padre e ferma la subshell
+    if (( $ffmpeg_status == 130 )); then
         kill -INT $$ 2>/dev/null
         return 130
     fi
+
+    if (( ffmpeg_status > 0 )) || [[ -z "$measured_i" ]]; then
+        print -P "${c_red} Errore durante l'analisi di $tag. ${c_red}Verrà saltato.${reset}"
+        echo "$file:t" >> .normalizer_failed_list
+        return 1
+    fi
+
 
     local measured_i=$(echo "$stats" | sed -n 's/.*"input_i" : "\([^"]*\)".*/\1/p')
     local measured_tp=$(echo "$stats" | sed -n 's/.*"input_tp" : "\([^"]*\)".*/\1/p')
@@ -398,5 +410,15 @@ else
     print -P "${c_magenta}Processo di normalizzazione completato. Livello medio db: ${c_yellow}${db}dB!${reset}"
 fi
 print -P "${c_white}========================================${reset}\n"
+
+# stampa eventuali errori
+if [[ -f .normalizer_failed_list ]]; then
+    print -P "\n\({c_red} Elenco dei file corrotti o falliti e saltati:\){reset}"
+    while read -r riga_file; do
+        print -P " ${c_orange}• ${riga_file}${reset}"
+    done < .normalizer_failed_list
+    rm -f .normalizer_failed_list
+fi
+print -P "\({c_white}========================================\){reset}\n"
 
 exit 0
