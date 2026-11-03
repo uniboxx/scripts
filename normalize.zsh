@@ -31,13 +31,13 @@ fi
 pulisci_ed_esci() {
     # Disattiva temporaneamente il trap per evitare cicli infiniti
     trap - INT TERM EXIT
-    print -P "\n${c_red}‼ Interruzione totale rilevata. Arresto immediato di tutte le conversioni...${reset}"
+    print -P "\n${c_orange}‼ Interruzione totale rilevata. Arresto immediato di tutte le operazioni...${reset}"
     
     # 1. Fermiamo subito tutti i processi in background (subshell e FFmpeg)
     # per evitare che continuino a scrivere file mentre puliamo
     local pid
-    for pid in ${(k)jobpids}; do
-        kill -TERM $pid 2>/dev/null
+    for pid in ${(k)running_pids}; do
+        kill -KILL $pid 2>/dev/null
     done
 
     # 2. RIMOZIONE SICURA DEI FILE TEMPORANEI (Risoluzione del Bug)
@@ -267,12 +267,13 @@ function normalize_file() {
     # Assegna un nome temporaneo per il file in elaborazione
     local target_file="${filename}_temp_processing.${ext}"
 
+    local stats ffmpeg_status
     # Passaggio 1: Analisi
     print -P "${c_cyan}----------------------------------------"
     print "Passaggio 1: Analisi di $tag"
 
-    local stats
     stats=$(ffmpeg -i "$file" -af loudnorm=I=-${db}:TP=-${tp}:LRA=${lra}:print_format=json -f null - 2>&1)
+    ffmpeg_status=$?
 
     local measured_i=$(echo "$stats" | sed -n 's/.*"input_i" : "\([^"]*\)".*/\1/p' | head -n 1)
     local measured_tp=$(echo "$stats" | sed -n 's/.*"input_tp" : "\([^"]*\)".*/\1/p' | head -n 1)
@@ -281,15 +282,7 @@ function normalize_file() {
     local target_offset=$(echo "$stats" | sed -n 's/.*"target_offset" : "\([^"]*\)".*/\1/p' | head -n 1)
 
     # Se la variabile measured_i è vuota, significa che l'analisi è fallita davvero
-    if [[ -z "$measured_i" || -z "$measured_tp" || -z "$measured_lra" ]]; then
-        local ffmpeg_status=$?
-        
-        # Se hai premuto CTRL+C (Codice 130), interrompi immediatamente tutto lo script
-        if (( ffmpeg_status == 130 )); then
-            kill -INT $$ 2>/dev/null
-            return 130
-        fi
-
+    if (( ffmpeg_status != 0 )) || [[ -z "$measured_i" || -z "$measured_tp" || -z "$measured_lra" ]]; then
         print -P "${c_red} ✘ Errore: Dati di analisi incompleti per $tag. ${c_red}Il file verrà saltato.${reset}"
         echo "$file:t" >> .normalizer_failed_list
         return 1
