@@ -259,7 +259,6 @@ function normalize_file() {
         return 1
     fi
 
-
     local measured_i=$(echo "$stats" | sed -n 's/.*"input_i" : "\([^"]*\)".*/\1/p')
     local measured_tp=$(echo "$stats" | sed -n 's/.*"input_tp" : "\([^"]*\)".*/\1/p')
     local measured_lra=$(echo "$stats" | sed -n 's/.*"input_lra" : "\([^"]*\)".*/\1/p')
@@ -289,6 +288,7 @@ function normalize_file() {
 
     # Esegue FFmpeg sul file di destinazione (target_file)
     if ffmpeg -y -i "$file" -af "loudnorm=I=-${db}:TP=-${tp}:LRA=${lra}:measured_i=${measured_i}:measured_tp=${measured_tp}:measured_lra=${measured_lra}:measured_thresh=${measured_thresh}:linear=${target_linear}" -c:v copy -c:a aac -b:a 192k "$target_file" >/dev/null 2>&1; then
+        
         # Controlla se il file == __
         local final_file=""
         if [[ "$filename:t" == *__ ]]; then
@@ -309,10 +309,19 @@ function normalize_file() {
         print -P "${c_green}----------------------------------------${reset}"
         print -P "✔ $tag ${c_green}completato con successo.${reset}"
     else
-        print -P "${c_red}----------------------------------------${reset}"
-        print -P "${c_red}✘ Errore durante l'elaborazione di: $tag."
+        # --- GESTIONE DEGLI ERRORI NEL PASSAGGIO 2 ---
+        local ffmpeg_norm_status=$?
         # Rimuove il file temporaneo/parziale se è stato creato per non lasciare spazzatura
-        [[ -f "$target_file" ]] && rm "$target_file"
+        [[ -f "$target_file" ]] && rm -f "$target_file"
+        # 1. Se si è premuto CTRL+C (Codice 130), ferma IMMEDIATAMENTE tutto lo script
+        if (( ffmpeg_norm_status == 130 )); then
+            kill -INT $$ 2>/dev/null
+            return 130
+        fi
+        # 2. Se è un fallimento tecnico (file corrotto o errore FFmpeg), salta e registra
+        print -P "${c_red} ✘ Errore critico durante la conversione di $tag.${c_red} Il file verrà saltato.${reset}"
+        echo "$file:t" >> .normalizer_failed_list
+        return 1
     fi
 }
 
@@ -413,12 +422,12 @@ print -P "${c_white}========================================${reset}\n"
 
 # stampa eventuali errori
 if [[ -f .normalizer_failed_list ]]; then
-    print -P "\n\({c_red} Elenco dei file corrotti o falliti e saltati:\){reset}"
+    print -P "\n${c_red} Elenco dei file corrotti o falliti e saltati:${reset}"
     while read -r riga_file; do
         print -P " ${c_orange}• ${riga_file}${reset}"
     done < .normalizer_failed_list
     rm -f .normalizer_failed_list
 fi
-print -P "\({c_white}========================================\){reset}\n"
+print -P "${c_white}========================================${reset}\n"
 
 exit 0
