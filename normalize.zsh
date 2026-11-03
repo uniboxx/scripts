@@ -159,7 +159,7 @@ function check_files() {
             local ext="${(L)file##*.}"
             if [[ -n "${extensions[(r)$ext]}" ]]; then
                 # 3. Se già normalizzato, lo salta
-                if [[ "${file:t:r}" == *_norm ]]; then
+                if [[ "${file:t:r}" == *_norm && "$only_analyze" != "true" ]]; then
                     already_normalized_list+=( "$file" )
                 else
                     # 4. Se non normalizzato, lo normalizza
