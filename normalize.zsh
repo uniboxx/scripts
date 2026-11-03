@@ -17,7 +17,7 @@ autoload -Uz compinit && compinit -i
 # Abilita globbing
 setopt EXTENDED_GLOB NULL_GLOB
 
-# registra eventuali errori 
+# rimuove eventuali file log precedenti di errori 
 typeset FAILED_LOG_FILE="./.normalizer_failed_list"
 rm -f "$FAILED_LOG_FILE" 2>/dev/null
 
@@ -246,29 +246,23 @@ function normalize_file() {
     local stats
     stats=$(ffmpeg -i "$file" -af loudnorm=I=-${db}:TP=-${tp}:LRA=${lra}:print_format=json -f null - 2>&1)
 
-    local ffmpeg_status=$?
-    # Se FFmpeg è stato interrotto (exit code 130), killa il padre e ferma la subshell
-    if (( $ffmpeg_status == 130 )); then
-        kill -INT $$ 2>/dev/null
-        return 130
-    fi
-
-    if (( ffmpeg_status > 0 )) || [[ -z "$measured_i" ]]; then
-        print -P "${c_red} Errore durante l'analisi di $tag. ${c_red}Verrà saltato.${reset}"
-        echo "$file:t" >> .normalizer_failed_list
-        return 1
-    fi
-
     local measured_i=$(echo "$stats" | sed -n 's/.*"input_i" : "\([^"]*\)".*/\1/p')
     local measured_tp=$(echo "$stats" | sed -n 's/.*"input_tp" : "\([^"]*\)".*/\1/p')
     local measured_lra=$(echo "$stats" | sed -n 's/.*"input_lra" : "\([^"]*\)".*/\1/p')
     local measured_thresh=$(echo "$stats" | sed -n 's/.*"input_thresh" : "\([^"]*\)".*/\1/p')
 
-    # Controllo di sicurezza: se la variabile è vuota, stampa i log di FFmpeg ed esce
-    if [[ -z "$measured_i" ]]; then
-        print "${c_red}Errore: Impossibile analizzare l'audio di $tag. ${c_cyan}Ecco l'output di FFmpeg:${reset}"
-        echo "$stats" | tail -n 25
-        print "${c_red}----------------------------------------${reset}"
+    # Se la variabile measured_i è vuota, significa che l'analisi è fallita davvero
+    if [[ -z "$measured_i" || -z "$measured_tp" || -z "$measured_lra" ]]; then
+        local ffmpeg_status=$?
+        
+        # Se hai premuto CTRL+C (Codice 130), interrompi immediatamente tutto lo script
+        if (( ffmpeg_status == 130 )); then
+            kill -INT $$ 2>/dev/null
+            return 130
+        fi
+
+        print -P "${c_red} ✘ Errore: Dati di analisi incompleti per $tag. ${c_red}Il file verrà saltato.${reset}"
+        echo "$file:t" >> .normalizer_failed_list
         return 1
     fi
 
@@ -413,21 +407,29 @@ done
 wait
 
 print -P "${c_white}========================================${reset}"
-if [[ $only_analyze == "true" ]]; then 
-    print -P "${c_cyan}Processo di analisi completato.${reset}"
-else
-    print -P "${c_magenta}Processo di normalizzazione completato. Livello medio db: ${c_yellow}${db}dB!${reset}"
-fi
-print -P "${c_white}========================================${reset}\n"
-
 # stampa eventuali errori
+local -a elenco_falliti=()
 if [[ -f .normalizer_failed_list ]]; then
+    # Legge il file di log riga per riga inserendolo in un array Zsh
+    elenco_falliti=( ${(f)"$(<.normalizer_failed_list)"} )
+    
     print -P "\n${c_red} Elenco dei file corrotti o falliti e saltati:${reset}"
-    while read -r riga_file; do
-        print -P " ${c_orange}• ${riga_file}${reset}"
-    done < .normalizer_failed_list
+    for f in "${elenco_falliti[@]}"; do
+        print -P " ${c_orange}• $f${reset}"
+    done
     rm -f .normalizer_failed_list
 fi
+# Mostra il successo della normalizzazione solo se almeno un file è passato
+if (( ${#files_list} > ${#elenco_falliti} )); then
+    if [[ "$only_analyze" == "true" ]]; then
+        print -P "${c_cyan} Processo di analisi completato.${reset}"
+    else
+        print -P "${c_magenta} Processo di normalizzazione completato. Livello medio db: ${c_yellow}${db} dB!${reset}"
+    fi
+else
+    print -P "${c_red} Nessun file è stato normalizzato a causa degli errori riscontrati.${reset}"
+fi
+
 print -P "${c_white}========================================${reset}\n"
 
 exit 0
