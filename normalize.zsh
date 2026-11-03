@@ -2,7 +2,7 @@
 
 # Autore: Davide Pedrotti
 # Data creazione: 18/10/2026
-# Ultima modifica: 02/11/2026
+# Ultima modifica: 03/11/2026
 
 # Descrizione: Converte l'audio dei file video in aac e normalizza l'audio con il valore della variabile db.
 
@@ -33,11 +33,39 @@ pulisci_ed_esci() {
     trap - INT TERM EXIT
     print -P "\n${c_red}‼ Interruzione totale rilevata. Arresto immediato di tutte le conversioni...${reset}"
     
-    # Rimuove in sicurezza solo i file temporanei legati a questo processo
+    # 1. Fermiamo subito tutti i processi in background (subshell e FFmpeg)
+    # per evitare che continuino a scrivere file mentre puliamo
+    local pid
+    for pid in ${(k)jobpids}; do
+        kill -TERM $pid 2>/dev/null
+    done
+
+    # 2. RIMOZIONE SICURA DEI FILE TEMPORANEI (Risoluzione del Bug)
+    # Raccogliamo le cartelle reali dei file che erano in elaborazione prima del blocco.
+    # Usiamo l'array originale $files_list (o la variabile in cui tieni la lista dei file passati).
+    # Estraiamo i percorsi assoluti delle loro directory (:A:h) ed eliminiamo solo lì dentro i file temporanei.
+    local dir
+    typeset -U cartelle_attive  # Array di Zsh che rimuove i duplicati in automatico
+    for f in "${files_list[@]}"; do
+        if [[ -f "$f" ]]; then
+            cartelle_attive+=("${f:A:h}")
+        fi
+    done
+
+    # Cancelliamo i file temporanei solo nelle cartelle dei video coinvolti
+    for dir in "${cartelle_attive[@]}"; do
+        rm -f "$dir"/*_temp_processing.* 2>/dev/null
+    done
+
+    # Per sicurezza estrema, puliamo anche la cartella corrente del terminale
     rm -f ./*_temp_processing.* 2>/dev/null
-    
-    # Invia il segnale TERM a TUTTI i processi del gruppo di questo script (subshell comprese)
-    kill -TERM -$$ 2>/dev/null
+
+    # 3. RIMOZIONE DEL LOG DEGLI ERRORI
+    # Il file di log viene creato nella cartella dove risiede lo SCRIPT ($0:A:h)
+    # o nella cartella di esecuzione. Li puliamo entrambi.
+    rm -f "${0:A:h}/.normalizer_failed_list" 2>/dev/null
+    rm -f ./.normalizer_failed_list 2>/dev/null
+
     exit 130
 }
 # Cattura il CTRL+C sia nello script principale che nei processi figli
@@ -246,10 +274,11 @@ function normalize_file() {
     local stats
     stats=$(ffmpeg -i "$file" -af loudnorm=I=-${db}:TP=-${tp}:LRA=${lra}:print_format=json -f null - 2>&1)
 
-    local measured_i=$(echo "$stats" | sed -n 's/.*"input_i" : "\([^"]*\)".*/\1/p')
-    local measured_tp=$(echo "$stats" | sed -n 's/.*"input_tp" : "\([^"]*\)".*/\1/p')
-    local measured_lra=$(echo "$stats" | sed -n 's/.*"input_lra" : "\([^"]*\)".*/\1/p')
-    local measured_thresh=$(echo "$stats" | sed -n 's/.*"input_thresh" : "\([^"]*\)".*/\1/p')
+    local measured_i=$(echo "$stats" | sed -n 's/.*"input_i" : "\([^"]*\)".*/\1/p' | head -n 1)
+    local measured_tp=$(echo "$stats" | sed -n 's/.*"input_tp" : "\([^"]*\)".*/\1/p' | head -n 1)
+    local measured_lra=$(echo "$stats" | sed -n 's/.*"input_lra" : "\([^"]*\)".*/\1/p' | head -n 1)
+    local measured_thresh=$(echo "$stats" | sed -n 's/.*"input_thresh" : "\([^"]*\)".*/\1/p' | head -n 1)
+    local target_offset=$(echo "$stats" | sed -n 's/.*"target_offset" : "\([^"]*\)".*/\1/p' | head -n 1)
 
     # Se la variabile measured_i è vuota, significa che l'analisi è fallita davvero
     if [[ -z "$measured_i" || -z "$measured_tp" || -z "$measured_lra" ]]; then
@@ -282,7 +311,8 @@ function normalize_file() {
 
     # Esegue FFmpeg sul file di destinazione (target_file)
     if ffmpeg -y -i "$file" -af "loudnorm=I=-${db}:TP=-${tp}:LRA=${lra}:measured_i=${measured_i}:measured_tp=${measured_tp}:measured_lra=${measured_lra}:measured_thresh=${measured_thresh}:linear=${target_linear}" -c:v copy -c:a aac -b:a 192k "$target_file" >/dev/null 2>&1; then
-        
+
+
         # Controlla se il file == __
         local final_file=""
         if [[ "$filename:t" == *__ ]]; then
@@ -313,7 +343,7 @@ function normalize_file() {
             return 130
         fi
         # 2. Se è un fallimento tecnico (file corrotto o errore FFmpeg), salta e registra
-        print -P "${c_red} ✘ Errore critico durante la conversione di $tag.${c_red} Il file verrà saltato.${reset}"
+        print -P "${c_red} ✘ Errore critico durante la normalizzazione di $tag.${c_red} Il file verrà saltato.${reset}"
         echo "$file:t" >> .normalizer_failed_list
         return 1
     fi
@@ -407,18 +437,6 @@ done
 wait
 
 print -P "${c_white}========================================${reset}"
-# stampa eventuali errori
-local -a elenco_falliti=()
-if [[ -f .normalizer_failed_list ]]; then
-    # Legge il file di log riga per riga inserendolo in un array Zsh
-    elenco_falliti=( ${(f)"$(<.normalizer_failed_list)"} )
-    
-    print -P "\n${c_red} Elenco dei file corrotti o falliti e saltati:${reset}"
-    for f in "${elenco_falliti[@]}"; do
-        print -P " ${c_orange}• $f${reset}"
-    done
-    rm -f .normalizer_failed_list
-fi
 # Mostra il successo della normalizzazione solo se almeno un file è passato
 if (( ${#files_list} > ${#elenco_falliti} )); then
     if [[ "$only_analyze" == "true" ]]; then
@@ -428,6 +446,20 @@ if (( ${#files_list} > ${#elenco_falliti} )); then
     fi
 else
     print -P "${c_red} Nessun file è stato normalizzato a causa degli errori riscontrati.${reset}"
+fi
+
+# stampa eventuali errori
+local -a elenco_falliti=()
+if [[ -f .normalizer_failed_list ]]; then
+print -P "${c_white}========================================${reset}\n"
+    # Legge il file di log riga per riga inserendolo in un array Zsh
+    elenco_falliti=( ${(f)"$(<.normalizer_failed_list)"} )
+    
+    print -P "\n${c_red} Elenco dei file corrotti o falliti e saltati:${reset}"
+    for f in "${elenco_falliti[@]}"; do
+        print -P " ${c_orange}• $f${reset}"
+    done
+    rm -f .normalizer_failed_list
 fi
 
 print -P "${c_white}========================================${reset}\n"
