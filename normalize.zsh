@@ -327,15 +327,10 @@ function normalize_file() {
         print -P "✔ $tag ${c_green}completato con successo.${reset}"
     else
         # --- GESTIONE DEGLI ERRORI NEL PASSAGGIO 2 ---
-        local ffmpeg_norm_status=$?
         # Rimuove il file temporaneo/parziale se è stato creato per non lasciare spazzatura
         [[ -f "$target_file" ]] && rm -f "$target_file"
-        # 1. Se si è premuto CTRL+C (Codice 130), ferma IMMEDIATAMENTE tutto lo script
-        if (( ffmpeg_norm_status == 130 )); then
-            kill -INT $$ 2>/dev/null
-            return 130
-        fi
-        # 2. Se è un fallimento tecnico (file corrotto o errore FFmpeg), salta e registra
+        
+        # 2. salta e registra
         print -P "${c_red} ✘ Errore critico durante la normalizzazione di $tag.${c_red} Il file verrà saltato.${reset}"
         echo "$file:t" >> .normalizer_failed_list
         return 1
