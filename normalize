@@ -85,7 +85,7 @@ export c_orange=$'\033[1;38;2;255;153;0m'
 # Variabili 
 # opzioni per ffmpeg
 typeset db="21"
-typeset lra="11"
+typeset lra="9"
 typeset tp="1.5"
 typeset target_linear="false"
 typeset only_analyze="false"
@@ -129,7 +129,6 @@ function sanitize_paths() {
 
     # 2. Creazione dell'array (separando sull'unico spazio rimasto)
     files_list=( ${(s: :)clean_string} )
-    
     # 3. Ciclo di conversione in percorsi assoluti
     for i in {1..${#files_list}}; do
         if [[ "${files_list[i]}" == \~/* ]]; then
@@ -289,9 +288,9 @@ function normalize_file() {
     fi
 
     # Mostra i valori rilevati a terminale
-    print -P "${c_cyan}----------------------------------------${reset}"
+    print -P "${c_magenta}----------------------------------------${reset}"
     print -P "${c_cyan}Analisi di $tag ${c_cyan}completata.${reset}"
-    print "${c_white}Valori rilevati -> I: ${c_orange}$measured_i${c_white} | TP: ${c_orange}$measured_tp${c_white} | LRA: ${c_orange}$measured_lra${c_white} | Thresh: ${c_orange}$measured_thresh${reset}"
+    print "${c_white}Valori rilevati -> I: ${c_orange}$measured_i${c_white} | LRA: ${c_orange}$measured_lra${c_white} | TP: ${c_orange}$measured_tp${c_white} | Thresh: ${c_orange}$measured_thresh${reset}"
 
     # Se viene passato il flag -a, si ferma qui ed evita il passaggio 2
     if [[ "$only_analyze" == "true" ]]; then
@@ -299,7 +298,6 @@ function normalize_file() {
     fi
 
     # Passaggio 2: Normalizzazione
-    print -P "${c_magenta}----------------------------------------${reset}"
     print "${c_magenta}Passaggio 2: Normalizzazione di $tag"
 
     # Esegue FFmpeg sul file di destinazione (target_file)
@@ -353,7 +351,7 @@ if [[ -z "$files" ]]; then
     sanitize_paths "${(j: :)default_glob}"
     
     if (( ${#files_list} == 0 )); then
-        print -P "\n${c_red}! Warning: Nessun file video ${(j:,:)extensions} trovato nella cartella corrente.${reset}\n"
+        print -P "\n${c_red}! Warning: Nessun file video ${(j:,:)extensions} trovato nella cartella corrente o carattere non consentito nel percorso del file.${reset}\n"
         exit 0
     fi
 
@@ -430,7 +428,7 @@ if (( ${#files_list} > ${#elenco_falliti} )); then
     if [[ "$only_analyze" == "true" ]]; then
         print -P "${c_cyan} Processo di analisi completato.${reset}"
     else
-        print -P "${c_magenta} Processo di normalizzazione completato. Livello medio db: ${c_yellow}${db} dB!${reset}"
+        print -P "${c_magenta} Processo di normalizzazione completato.\n${reset} ${c_white}Valori usati -> I: ${c_orange}-${db}${reset} ${c_white}| LRA: ${c_orange}${lra}${reset} ${c_white}| TP: ${c_orange}${tp}${reset}"
     fi
 else
     print -P "${c_red} Nessun file è stato normalizzato a causa degli errori riscontrati.${reset}"
