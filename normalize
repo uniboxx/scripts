@@ -428,7 +428,7 @@ if (( ${#files_list} > ${#elenco_falliti} )); then
     if [[ "$only_analyze" == "true" ]]; then
         print -P "${c_cyan} Processo di analisi completato.${reset}"
     else
-        print -P "${c_magenta} Processo di normalizzazione completato.\n${reset} ${c_white}Valori usati -> I: ${c_orange}-${db}${reset} ${c_white}| LRA: ${c_orange}${lra}${reset} ${c_white}| TP: ${c_orange}${tp}${reset}"
+        print -P "${c_magenta} Processo di normalizzazione completato.\n${reset} ${c_white}Valori usati -> I: ${c_orange}-${db}${reset} ${c_white}| LRA: ${c_orange}${lra}${reset} ${c_white}| TP: ${c_orange}-${tp}${reset}"
     fi
 else
     print -P "${c_red} Nessun file è stato normalizzato a causa degli errori riscontrati.${reset}"
