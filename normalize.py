@@ -3,7 +3,7 @@
 # Author: Davide Pedrotti
 # Create: 19/11/26
 # Update: 25/11/26
-# Description: Normalize or analyze audio in video files (2-pass EBU R128, parallel)
+# Description: Normalize or analyze audio in video files (2-pass EBU R128, parallel execution default to half of available CPU cores)
 # Requirements: python3, ffmpeg, ffprobe, trash
 # Usage: normalize [-a] [--lra VAL] [-k] [video_files ...]
 # for help: normalize -h
