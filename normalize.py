@@ -1,6 +1,9 @@
 #!/usr/bin/env python3
 
-# Author: Davide Pedrotti
+# Author: unibox
+# Email: unibox@duck.com
+# License: MIT
+# Version: 1.0
 # Create: 19/11/26
 # Update: 25/11/26
 # Description: Normalize or analyze audio in video files (2-pass EBU R128, parallel execution default to half of available CPU cores)
