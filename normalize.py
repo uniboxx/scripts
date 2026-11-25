@@ -5,7 +5,8 @@
 # Update: 25/11/26
 # Description: Normalize or analyze audio in video files (2-pass EBU R128, parallel)
 # Requirements: python3, ffmpeg, ffprobe, trash
-# Usage: normalize [-h] [-a] [--lra VAL] [-k] [video_files ...]
+# Usage: normalize [-a] [--lra VAL] [-k] [video_files ...]
+# for help: normalize -h
 
 # import modules
 import argparse
